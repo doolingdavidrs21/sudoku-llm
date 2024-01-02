@@ -423,3 +423,29 @@ def make_9X9_puzzles(i:int = 10):
 
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
+# we need a streamlit input form that picks the 
+# puzzle type :4X4 or 9X9
+# the number of few shot examples k, an integer
+# the openai model, one of gpt-4 , gpt-4-1106-preview'
+# the temperature, a float between 0 and 2
+
+# maybe add another option like "Be encouraging?" and then change the prompt appropriately.
+
+with st.form("my_form"):
+    st.write("Input parameters:")
+    model = st.selectbox('Pick an OpenAI model', ['gpt-4-1106-preview','gpt-4', 'gpt-3.5-turbo'])
+    k = st.slider('Pick the number of examples to show the model in the instructions', 1, 10)
+    j = st.slider('Pick the nmber of puzzles to ask the model to try', 2, 20)
+    temperature = st.number_input('Select the model temperature', min_value=0., max_value=2., value = 0.0, step=0.01)
+    submit = st.form_submit_button("Run experiment")
+
+
+# this is outside the form
+#submit = my_form.form_submit_button('Run experiment')
+if submit:
+    st.write(model)
+    st.write(k)
+    st.write(temperature)
+    
+    
+
