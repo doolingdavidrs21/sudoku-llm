@@ -33,6 +33,9 @@ from langchain.chains import ConversationChain
 from langchain.chains import RetrievalQA
 
 
+embeddings = OpenAIEmbeddings()
+
+
 class SudokuGenerator9X9:
 	"""generates and solves Sudoku puzzles using a backtracking algorithm"""
 	def __init__(self,grid=None):
@@ -431,11 +434,72 @@ os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
 # maybe add another option like "Be encouraging?" and then change the prompt appropriately.
 
+
+def get_examples(new_puzzle:str, rqa):
+    """
+    takes in a new_puzzle with format like
+    [[0, 0, 4, 0], [0, 0, 0, 0], [0, 3, 0, 0], [1, 0, 0, 2]]
+    and returns the string of examples that will
+    go into the template_string
+    """
+    results = rqa({"query":new_puzzle})
+    examples = results['source_documents']
+    eg_string = ''
+    for eg in examples:
+        eg_string += eg.page_content + '\n'
+    return eg_string
+
+
+
+template_string =  """
+role: You An expert Sudoku Puzzle solver that can solve 9X9 puzzles as well as 4X4 puzzles.
+content: Here are some example puzzles and their solutions.
+
+{example_solutions}
+
+The rules of 4x4 Sudoku puzzles are the same as with traditional Sudoku grids.
+Only the number of cells and digits to be placed are different.
+1. The numbers 1, 2, 3 and 4 must occur only once in each column
+2. The numbers 1, 2, 3 and 4 must occur only once in each row.
+3. The clues allocated at the beginning of the puzzle cannot be changed or moved.
+
+Each row and column must contain each of the numbers 1-4. 
+Each of the four corner areas of 4 cells must also contain each of the numbers 1-4.
+In addition, the four corner cells must contain the numbers 1-4 AND
+the central square of four cells must contain the numbers 1-4.
+
+
+task: Using the rules of Sudoku, solve the initial 4X4 grid below. 0 indicates a missing
+digit needing to be filled in. Think Step by Step.
+Break it down carefully. Think logically and carefully. Each step in your solution
+should be correct and obvious logically. No erasers needed for your expertise!
+{puzzle}
+
+The rules of 4x4 Sudoku puzzles are the same as with traditional Sudoku grids.
+Only the number of cells and digits to be placed are different.
+1. The numbers 1, 2, 3 and 4 must occur only once in each column
+2. The numbers 1, 2, 3 and 4 must occur only once in each row.
+3. The clues allocated at the beginning of the puzzle cannot be changed or moved.
+
+Did you answer the previous question correctly? Your previous answer was {previous}. The actual solution is {answer}.
+This is the puzzle to be solved:
+{puzzle}
+
+Work this out in a step-by-step way. Take your time.
+
+{format_instructions}
+"""
+
+
+
+
+
+
 with st.form("my_form"):
     st.write("Input parameters:")
     model = st.selectbox('Pick an OpenAI model', ['gpt-4-1106-preview','gpt-4', 'gpt-3.5-turbo'])
     k = st.slider('Pick the number of examples to show the model in the instructions', 1, 10)
-    j = st.slider('Pick the nmber of puzzles to ask the model to try', 2, 20)
+    j = st.slider('Pick the number of puzzles to ask the model to try', 2, 20)
     temperature = st.number_input('Select the model temperature', min_value=0., max_value=2., value = 0.0, step=0.01)
     submit = st.form_submit_button("Run experiment")
 
@@ -446,6 +510,107 @@ if submit:
     st.write(model)
     st.write(k)
     st.write(temperature)
+
+    with open("puzzle4X4_dict.pkl", "rb") as f:
+        puzzle4X4_dict = pickle.load(f)
+    embeddings = OpenAIEmbeddings()
+    docsearch4X4 = FAISS.load_local("faiss_index_4X4", embeddings) # might be able to cache this
+    retriever = docsearch4X4.as_retriever(search_type="similarity", search_kwargs={"k":k})
+
+    # create the chain to answer question
+
+    rqa = RetrievalQA.from_chain_type(llm=ChatOpenAI(model_name= model),
+                                  chain_type="stuff",
+                                  retriever=retriever,
+                                  return_source_documents=True)
+    test_dict = make_4X4_puzzles(i=j+2)
     
+    chat_llm = ChatOpenAI(model_name = model, temperature=temperature)
+#chat_llm = ChatOpenAI(model_name = "gpt-3.5-turbo", temperature=0)
+
+    puzzle_name_schema = ResponseSchema(name="input_puzzle",
+                             description="This is the sudoku puzzle to be solved")
+
+    solution_schema = ResponseSchema(name="solution",
+                                      description="This is the puzzle solution")
+
+    reasoning_schema = ResponseSchema(name="reasoning",
+                                    description="This is the reasons for the solution")
+
+    confidence_schema = ResponseSchema(name="confidence",
+                                   description="This is the confidence in the solution, a number between 0 and 1.")
+
+    response_schemas = [puzzle_name_schema,
+                    solution_schema,
+                    reasoning_schema,
+                   confidence_schema]
+
+    output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
+
+    format_instructions = output_parser.get_format_instructions()
+    prompt = ChatPromptTemplate.from_template(template=template_string)
+    def get_messages(i:int, format_instructions:str=format_instructions, previous:str='correct'):
+        """
+        i is the index of the test_dict solved puzzle dictionary.
+        Returns the prompt.format_messages result
+        where the puzzle to be solbed corresponds
+        to the ith key of the puzzle dictionary.
+        """
+        messages = prompt.format_messages(
+            example_solutions = get_examples(str(test_dict[i][0]), rqa), # i = 0
+            puzzle = test_dict[i][0],
+            previous=previous,
+            answer=test_dict[i-1],
+          #  input_puzzle=test_dict[i][0],
+            format_instructions=format_instructions    
+        )
+        return messages
     
+    llm = ChatOpenAI(model_name = model, temperature=temperature)
+    #llm = ChatOpenAI(model_name = "gpt-4", temperature=0)
+    # we set a low k=2, to only keep the last 2 interactions in memory
+    #llm = ChatOpenAI(model_name = "davinci-002", temperature=0.2)
+    window_memory = ConversationBufferWindowMemory(k=2)
+
+    conversation = ConversationChain(
+        llm=llm, 
+       # llm=llm_llama2,
+        verbose=True, 
+        memory=window_memory
+    )
+    results = []
+    for i in range(1, j+1):
+        if len(results) > 0:
+            last = results[-1]
+            if last == True:
+                previous = 'correct'
+            else:
+                previous = 'incorrect'
+        else:
+            previous = 'correct'
+   # example_solutions = get_examples(str(test_dict[i][0])) # i = 0
+        messages =  get_messages(i=i, previous=previous)
+        response = conversation.predict(input=messages[0].content)
+        st.write(response)
+        try:
+            response_as_dict = output_parser.parse(response)
+            res = test_dict[i][1] == ast.literal_eval(response_as_dict["solution"])
+            print(test_dict[i][1], ast.literal_eval(response_as_dict["solution"]))
+            print(res, i, "can use output_parser", response_as_dict["confidence"])
+            results.append(res)
+        except:
+            res = str(test_dict[i][1])  in response
+            #print(puzzle4X4_dict[i][1], ast.literal_eval(response_as_dict["solution"]))
+            print(response)
+            st.write(response)
+            print(res, i, "can not use output_parser")
+            results.append(res)
+        print(pd.Series(results).value_counts())
+        st.write(pd.Series(results).value_counts())
+
+    print(pd.Series(results).value_counts())
+    st.write(pd.Series(results).value_counts())
+
+
+
 
