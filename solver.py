@@ -532,7 +532,8 @@ Work this out in a step-by-step way. Take your time.
 with st.form("my_form"):
     st.write("Input parameters:")
     puzzle_type = st.selectbox('Pick the puzzle type', ['4X4','9X9'])
-    model = st.selectbox('Pick an OpenAI model', ['gpt-4', 'gpt-4-1106-preview','gpt-4'])
+    model = st.selectbox('Pick an OpenAI model', ['gpt-4', 'gpt-4-1106-preview','gpt-4',
+                                                 'gpt-3.5-turbo-1106'])
     k = st.slider('Pick the number of examples to show the model in the instructions', 1, 10)
     j = st.slider('Pick the number of puzzles to ask the model to try', 2, 20)
     temperature = st.number_input('Select the model temperature', min_value=0., max_value=2., value = 0.0, step=0.01)
@@ -696,8 +697,8 @@ if submit:
             print(res, i, "can not use output_parser")
             st.write("actual solution:")
             st.write(test_dict[i][1])
-            st.write("LLM solution:")
-            st.write(ast.literal_eval(response_as_dict["solution"]))
+           # st.write("LLM solution:")
+           # st.write(ast.literal_eval(response_as_dict["solution"]))
             results.append(res)
         print(pd.Series(results).value_counts())
         st.write(pd.Series(results).value_counts())
