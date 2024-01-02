@@ -33,6 +33,8 @@ from langchain.chains import ConversationChain
 from langchain.chains import RetrievalQA
 
 
+#st.set_page_config(layout="wide")
+
 embeddings = OpenAIEmbeddings()
 
 
@@ -497,7 +499,8 @@ Work this out in a step-by-step way. Take your time.
 
 with st.form("my_form"):
     st.write("Input parameters:")
-    model = st.selectbox('Pick an OpenAI model', ['gpt-4-1106-preview','gpt-4', 'gpt-3.5-turbo'])
+    puzzle_type = st.selectbox('Pick the puzzle type', ['4X4','9X9'])
+    model = st.selectbox('Pick an OpenAI model', ['gpt-4', 'gpt-4-1106-preview','gpt-4'])
     k = st.slider('Pick the number of examples to show the model in the instructions', 1, 10)
     j = st.slider('Pick the number of puzzles to ask the model to try', 2, 20)
     temperature = st.number_input('Select the model temperature', min_value=0., max_value=2., value = 0.0, step=0.01)
@@ -507,9 +510,7 @@ with st.form("my_form"):
 # this is outside the form
 #submit = my_form.form_submit_button('Run experiment')
 if submit:
-    st.write(model)
-    st.write(k)
-    st.write(temperature)
+    st.write("Preparing the experiment:")
 
     with open("puzzle4X4_dict.pkl", "rb") as f:
         puzzle4X4_dict = pickle.load(f)
@@ -591,12 +592,56 @@ if submit:
    # example_solutions = get_examples(str(test_dict[i][0])) # i = 0
         messages =  get_messages(i=i, previous=previous)
         response = conversation.predict(input=messages[0].content)
+        st.write(messages[0].content)
         st.write(response)
         try:
             response_as_dict = output_parser.parse(response)
             res = test_dict[i][1] == ast.literal_eval(response_as_dict["solution"])
             print(test_dict[i][1], ast.literal_eval(response_as_dict["solution"]))
             print(res, i, "can use output_parser", response_as_dict["confidence"])
+            dfactual = pd.DataFrame.from_records(test_dict[i][1])
+            dflmm = pd.DataFrame.from_records(ast.literal_eval(response_as_dict["solution"]))
+            #st.write(test_dict[i][1])
+            dfpuzzle = pd.DataFrame.from_records(test_dict[i][0])
+            st.markdown('### Puzzle')            
+            # style
+            th_props = [
+                  ('font-size', '14px'),
+                  ('text-align', 'center'),
+                  ('font-weight', 'bold'),
+                  ('color', '#FF0000'),
+              #    ('background-color', '#f7ffff')
+            ]
+            td_props = [
+                  ('font-size', '12px')
+              ]
+            styles = [
+              dict(selector="th", props=th_props),
+              dict(selector="td", props=td_props)
+              ]
+           # dftablepuzzle = dfpuzzle.style.set_table_styles(styles)
+            dfpuzzlecolor = dfpuzzle.style.set_table_styles(
+                       [{
+                           'selector': 'th',
+                       'props': [('color', 'red')]
+                       }]
+            )
+           # st.table(dftablepuzzle)
+            st.dataframe(dfpuzzle, hide_index=True)
+          #  st.markdown(dfpuzzle.set_properties(**{'color': '#F0000',
+           #                 'font-weight': 'hold'}.hide(axis=0).hide(axis=1).to_html(),
+           #                                     unsafe_allow_html=True))
+           # rows[0].markdown('|'.join(dfpuzzle.to_markdown(index=False).replace('0', '').split('|')[5:])[1:])
+            rows = st.columns(2)
+            rows[0].markdown('### Actual Solution')
+            rows[0].dataframe(dfactual, hide_index=True)
+            rows[1].markdown('### LLM Solution')
+            rows[1].dataframe(dflmm, hide_index=True)
+            st.markdown('### LLM reasoning / chain-of-thought')
+            st.write(response_as_dict["reasoning"])
+            #st.write(dfactual)
+            #st.write("LLM solution:")
+            #st.write(ast.literal_eval(response_as_dict["solution"]))
             results.append(res)
         except:
             res = str(test_dict[i][1])  in response
@@ -604,11 +649,16 @@ if submit:
             print(response)
             st.write(response)
             print(res, i, "can not use output_parser")
+            st.write("actual solution:")
+            st.write(test_dict[i][1])
+            st.write("LLM solution:")
+            st.write(ast.literal_eval(response_as_dict["solution"]))
             results.append(res)
         print(pd.Series(results).value_counts())
         st.write(pd.Series(results).value_counts())
 
     print(pd.Series(results).value_counts())
+    st.write("Final results:")
     st.write(pd.Series(results).value_counts())
 
 
