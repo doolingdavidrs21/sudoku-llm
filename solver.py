@@ -418,7 +418,7 @@ def make_9X9_puzzles(i:int = 10):
     puzzle9X9_dict = dict()
     for j in range(i):
         new_puzzle = SudokuGenerator9X9()
-        dfpuzzle9x9 = pd.DataFrame.from_records(new_puzzle.grid)
+        dfpuzzle9X9 = pd.DataFrame.from_records(new_puzzle.grid)
         new_puzzle_sol = SudokuGenerator9X9(grid=dfpuzzle9X9.to_numpy().tolist())
         puzzle9X9_dict[j] = (new_puzzle.grid, new_puzzle_sol.grid)
     return puzzle9X9_dict
@@ -453,7 +453,7 @@ def get_examples(new_puzzle:str, rqa):
 
 
 
-template_string =  """
+template_string_4X4 =  """
 role: You An expert Sudoku Puzzle solver that can solve 9X9 puzzles as well as 4X4 puzzles.
 content: Here are some example puzzles and their solutions.
 
@@ -467,8 +467,7 @@ Only the number of cells and digits to be placed are different.
 
 Each row and column must contain each of the numbers 1-4. 
 Each of the four corner areas of 4 cells must also contain each of the numbers 1-4.
-In addition, the four corner cells must contain the numbers 1-4 AND
-the central square of four cells must contain the numbers 1-4.
+
 
 
 task: Using the rules of Sudoku, solve the initial 4X4 grid below. 0 indicates a missing
@@ -494,6 +493,39 @@ Work this out in a step-by-step way. Take your time.
 
 
 
+template_string_9X9 =  """
+role: You An expert Sudoku Puzzle solver that can solve 9X9 puzzles as well as 4X4 puzzles.
+content: Here are some example puzzles and their solutions.
+
+{example_solutions}
+
+The rules of 9x9 Sudoku puzzles are the same as with traditional Sudoku grids.
+Only the number of cells and digits to be placed are different.
+1. EAch row hsould have numbers 1-9, no repeats.
+2. Each column should have numbers 1-9, no repeats.
+3. Each 3X3 quadrant should have numbers 1-9, no repeats.
+3. The clues allocated at the beginning of the puzzle cannot be changed or moved.
+
+
+
+
+task: Using the rules of Sudoku, solve the initial 9X9 grid below. 0 indicates a missing
+digit needing to be filled in. Think Step by Step.
+Break it down carefully. Think logically and carefully. Each step in your solution
+should be correct and obvious logically. No erasers needed for your expertise!
+{puzzle}
+
+
+
+Did you answer the previous question correctly? Your previous answer was {previous}. The actual solution is {answer}.
+This is the puzzle to be solved:
+{puzzle}
+
+Work this out in a step-by-step way. Take your time.
+
+{format_instructions}
+"""
+
 
 
 
@@ -512,11 +544,21 @@ with st.form("my_form"):
 if submit:
     st.write("Preparing the experiment:")
 
-    with open("puzzle4X4_dict.pkl", "rb") as f:
-        puzzle4X4_dict = pickle.load(f)
+    if puzzle_type == '4X4':
+        with open("puzzle4X4_dict.pkl", "rb") as f:
+            puzzle_dict = pickle.load(f)
+        docsearch = FAISS.load_local("faiss_index_4X4", embeddings) # might be able to cache this
+        test_dict = make_4X4_puzzles(i=j+2)
+        template_string = template_string_4X4[:]
+    if puzzle_type == '9X9':
+        with open("puzzle9X9_dict.pkl", "rb") as f:
+            puzzle_dict = pickle.load(f)
+        docsearch = FAISS.load_local("faiss_index_9X9", embeddings) # might be able to cache this
+        test_dict = make_9X9_puzzles(i=j+2)
+        template_string = template_string_9X9[:]
     embeddings = OpenAIEmbeddings()
-    docsearch4X4 = FAISS.load_local("faiss_index_4X4", embeddings) # might be able to cache this
-    retriever = docsearch4X4.as_retriever(search_type="similarity", search_kwargs={"k":k})
+    #docsearch4X4 = FAISS.load_local("faiss_index_4X4", embeddings) # might be able to cache this
+    retriever = docsearch.as_retriever(search_type="similarity", search_kwargs={"k":k})
 
     # create the chain to answer question
 
@@ -524,7 +566,7 @@ if submit:
                                   chain_type="stuff",
                                   retriever=retriever,
                                   return_source_documents=True)
-    test_dict = make_4X4_puzzles(i=j+2)
+    #test_dict = make_4X4_puzzles(i=j+2)
     
     chat_llm = ChatOpenAI(model_name = model, temperature=temperature)
 #chat_llm = ChatOpenAI(model_name = "gpt-3.5-turbo", temperature=0)
@@ -571,7 +613,10 @@ if submit:
     #llm = ChatOpenAI(model_name = "gpt-4", temperature=0)
     # we set a low k=2, to only keep the last 2 interactions in memory
     #llm = ChatOpenAI(model_name = "davinci-002", temperature=0.2)
-    window_memory = ConversationBufferWindowMemory(k=2)
+    if puzzle_type == '4X4':
+        window_memory = ConversationBufferWindowMemory(k=2)
+    if puzzle_type == '9X9':
+        window_memory = ConversationBufferWindowMemory(k=1)
 
     conversation = ConversationChain(
         llm=llm, 
