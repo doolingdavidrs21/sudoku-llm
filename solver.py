@@ -1,12 +1,12 @@
 import pandas as pd
-import plotly.express as px
-#import altair as alt
+#import plotly.express as px
+import altair as alt
 import re
-import plotly.graph_objects as go
+#import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
 import math
-import plotly.io as pio
+#import plotly.io as pio
 #import altair as alt
 import pickle
 from langchain.chat_models import ChatOpenAI
@@ -472,7 +472,7 @@ Each of the four corner areas of 4 cells must also contain each of the numbers 1
 
 
 task: Using the rules of Sudoku, solve the initial 4X4 grid below. 0 indicates a missing
-digit needing to be filled in. Think Step by Step. I will pay you $5,000 dollars for a correct solution.
+digit needing to be filled in. Think Step by Step. 
 Break it down carefully. Think logically and carefully. Each step in your solution
 should be correct and obvious logically. No erasers needed for your expertise!
 {puzzle}
@@ -511,7 +511,7 @@ Only the number of cells and digits to be placed are different.
 
 
 task: Using the rules of Sudoku, solve the initial 9X9 grid below. 0 indicates a missing
-digit needing to be filled in. Think Step by Step. I will pay you $5,000 dollars for a correct solution.
+digit needing to be filled in. Think Step by Step. 
 Break it down carefully. Think logically and carefully. Each step in your solution
 should be correct and obvious logically. No erasers needed for your expertise!
 {puzzle}
@@ -724,6 +724,15 @@ if submit:
     print(pd.Series(results).value_counts())
     st.write("Final results:")
     st.write(pd.Series(results).value_counts())
+    bool_series = pd.Series(results).value_counts()
+    df = bool_series.to_frame()
+    df['result'] = df.index
+    chart = alt.Chart(df).mark_bar().encode(
+        x='result',
+        y = 'count'
+    )
+    st.altair_chart(chart, theme="streamlit", use_container_width=True)
+   
 
 
 
