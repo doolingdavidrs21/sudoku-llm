@@ -1,5 +1,5 @@
 altair==5.2.0
-langchain==0.0.353
+langchain==0.0.352
 numpy==1.26.3
 openai==1.6.1
 pandas==2.1.4
