@@ -12,7 +12,7 @@ import pickle
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+#from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 import numpy as np
 from random import shuffle
 import copy
