@@ -1,12 +1,13 @@
 import pandas as pd
 import plotly.express as px
 #import altair as alt
+import re
 import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
 import math
 import plotly.io as pio
-import altair as alt
+#import altair as alt
 import pickle
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
@@ -471,7 +472,7 @@ Each of the four corner areas of 4 cells must also contain each of the numbers 1
 
 
 task: Using the rules of Sudoku, solve the initial 4X4 grid below. 0 indicates a missing
-digit needing to be filled in. Think Step by Step.
+digit needing to be filled in. Think Step by Step. I will pay you $5,000 dollars for a correct solution.
 Break it down carefully. Think logically and carefully. Each step in your solution
 should be correct and obvious logically. No erasers needed for your expertise!
 {puzzle}
@@ -510,7 +511,7 @@ Only the number of cells and digits to be placed are different.
 
 
 task: Using the rules of Sudoku, solve the initial 9X9 grid below. 0 indicates a missing
-digit needing to be filled in. Think Step by Step.
+digit needing to be filled in. Think Step by Step. I will pay you $5,000 dollars for a correct solution.
 Break it down carefully. Think logically and carefully. Each step in your solution
 should be correct and obvious logically. No erasers needed for your expertise!
 {puzzle}
@@ -692,11 +693,28 @@ if submit:
         except:
             res = str(test_dict[i][1])  in response
             #print(puzzle4X4_dict[i][1], ast.literal_eval(response_as_dict["solution"]))
-            print(response)
-            st.write(response)
+            #print(response)
+            #st.write(response)
             print(res, i, "can not use output_parser")
-            st.write("actual solution:")
-            st.write(test_dict[i][1])
+            dfactual = pd.DataFrame.from_records(test_dict[i][1])
+            #st.write("actual solution:")
+            #st.write(test_dict[i][1])
+            solution_matches = re.findall(r'"solution": "(.*?)"', response)
+            reasoning_matches = re.findall(r'"reasoning": "(.*?)"', response)
+            last_solution = solution_matches[-1] if solution_matches else None
+            last_reasoning = reasoning_matches[-1] if reasoning_matches else None
+            dflmm = pd.DataFrame.from_records(ast.literal_eval(last_solution))
+            dfpuzzle = pd.DataFrame.from_records(test_dict[i][0])
+            st.markdown('### Puzzle')   
+            st.dataframe(dfpuzzle, hide_index=True)
+            rows = st.columns(2)
+            rows[0].markdown('### Actual Solution')
+            rows[0].dataframe(dfactual, hide_index=True)
+            rows[1].markdown('### LLM Solution')
+            rows[1].dataframe(dflmm, hide_index=True)
+            st.markdown('### LLM reasoning / chain-of-thought')
+            st.write(last_reasoning)
+            
            # st.write("LLM solution:")
            # st.write(ast.literal_eval(response_as_dict["solution"]))
             results.append(res)
