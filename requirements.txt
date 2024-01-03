@@ -1,0 +1,7 @@
+altair==5.2.0
+langchain==0.0.353
+numpy==1.26.3
+openai==1.6.1
+pandas==2.1.4
+python-dotenv==1.0.0
+streamlit==1.29.0
